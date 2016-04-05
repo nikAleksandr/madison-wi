@@ -1,22 +1,20 @@
-import processing.io.*;
-
 //Based on code written by Limor "Ladyada" for Adafruit Industries
+import processing.io.*;
+// script uses Board numbers (IE Physical pin numbers)
+// processing defaults to GPIO number, RPI to use physical pin numbers
+// may need to convert pins to their RPI.PIN# versions here. 
+int SPICLK = 18;
+int SPIMISO = 23;
+int SPIMOSI = 24;
+int SPICS = 25;
+
+boolean debug = true;
 
 
 void setup() {
-  boolean debug = true;
-  
-  // script uses Board numbers (IE Physical pin numbers)
-  // processing defaults to GPIO number, RPI to use physical pin numbers
-  // may need to convert pins to their RPI.PIN# versions here. 
-  int SPICLK = RPI.PIN18;
-  int SPIMISO = RPI.PIN23;
-  int SPIMOSI = RPI.PIN24;
-  int SPICS = RPI.PIN25;
-  
   //set up the SPI interface
   GPIO.pinMode(SPIMOSI, GPIO.OUTPUT);
-  GPIO.pinMode(SPIMISO, GPIO.OUTPUT);
+  GPIO.pinMode(SPIMISO, GPIO.INPUT);
   GPIO.pinMode(SPICLK, GPIO.OUTPUT);
   GPIO.pinMode(SPICS, GPIO.OUTPUT);
   
@@ -30,14 +28,14 @@ void setup() {
 void draw(){
   //read the FSRs
   int FSR1 = readadc(0, SPICLK, SPIMOSI, SPIMISO, SPICS);
-  int FSR2 = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS);
+  //int FSR2 = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS);
   //int FSR3 = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS);
   //int FSR4 = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS);
   
   
   if(debug){
     println("pressure 1:" + FSR1);
-    println("pressure 2:" + FSR2);
+    //println("pressure 2:" + FSR2);
   }
   
   //if threshold for tolerence is met, fire main program
@@ -50,37 +48,37 @@ int readadc(int adcnum, int clockpin, int mosipin, int misopin, int cspin){
   if((adcnum > 7) || (adcnum < 0)){
     return -1;
   }
-  GPIO.digitalWrite(cspin, true);
+  GPIO.digitalWrite(cspin, GPIO.HIGH);
   
-  GPIO.digitalWrite(clockpin, false); //start clock low
-  GPIO.digitalWrite(cspin, false);    //bring CS low
+  GPIO.digitalWrite(clockpin, GPIO.LOW); //start clock low
+  GPIO.digitalWrite(cspin, GPIO.LOW);    //bring CS low
   
   int commandout = adcnum;
   commandout |= 0x18; //start bit is hex 24 + single-ended bit
   commandout <<= 3; //we only need to send 5 bits here
   for(int i = 0; i<5; i++){
-    if(commandout & 0x80){
-      GPIO.digitalWrite(mosipin, true);
+    if((commandout & 0x80) > 0){
+      GPIO.digitalWrite(mosipin, GPIO.HIGH);
     } else{
-      GPIO.digitalWrite(mosipin, false);
+      GPIO.digitalWrite(mosipin, GPIO.LOW);
     }
     commandout <<= 1;
-    GPIO.digitalWrite(clockpin, true);
-    GPIO.digitalWrite(clockpin, false;
+    GPIO.digitalWrite(clockpin, GPIO.HIGH);
+    GPIO.digitalWrite(clockpin, GPIO.LOW);
   }
   
-  adcout = 0;
-  //read in one empty bit, one null bit adn 10 ADC bits
+  int adcout = 0;
+  //read in one empty bit, one null bit and 10 ADC bits
   for(int i = 0; i < 12; i++){
-    GPIO.digitalWrite(clockpin, true);
-    GPIO.digitalWrite(clockpin, true);
+    GPIO.digitalWrite(clockpin, GPIO.HIGH);
+    GPIO.digitalWrite(clockpin, GPIO.LOW);
     adcout <<= 1;
-    if(GPIO.digitalRead(misopin)){
+    if(GPIO.digitalRead(misopin)==GPIO.HIGH){
       adcout |= 0x1;
     }
   }
   
-  GPIO.digitalWrite(cspin, true);
+  GPIO.digitalWrite(cspin, GPIO.HIGH);
   
   adcout >>= 1; //first bit is 'null' so drop it
   return adcout;

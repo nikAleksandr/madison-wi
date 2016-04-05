@@ -1,7 +1,8 @@
 PImage madison;
 float x, y, a, b, r=1, th;
-int numPoint = 300;
+int numPoint = 100;
 int blur = 30;
+int time_to_dis = 5; //a time to dissipation
 float[][] pointsFromCircle = new float[numPoint][numPoint];
 float[][] pointsFromInnerCircle = new float[numPoint][numPoint];
 float[][] pointsFromOuterCircle = new float[numPoint][numPoint];
@@ -15,7 +16,7 @@ void setup() {
   smooth();
   stroke(255, 15);
   noFill();
-  frameRate(60);
+  frameRate(30);
 }
 
 void draw() {
