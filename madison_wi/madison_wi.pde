@@ -1,20 +1,51 @@
-//import processing.io.*;
+import processing.io.*;
 
 //Based on code written by Limor "Ladyada" for Adafruit Industries
 
 
-int debug = 1;
-
 void setup() {
+  boolean debug = true;
   
+  // script uses Board numbers (IE Physical pin numbers)
+  // processing defaults to GPIO number, RPI to use physical pin numbers
+  // may need to convert pins to their RPI.PIN# versions here. 
+  int SPICLK = RPI.PIN18;
+  int SPIMISO = RPI.PIN23;
+  int SPIMOSI = RPI.PIN24;
+  int SPICS = RPI.PIN25;
+  
+  //set up the SPI interface
+  GPIO.pinMode(SPIMOSI, GPIO.OUTPUT);
+  GPIO.pinMode(SPIMISO, GPIO.OUTPUT);
+  GPIO.pinMode(SPICLK, GPIO.OUTPUT);
+  GPIO.pinMode(SPICS, GPIO.OUTPUT);
+  
+  //may want to introduce a tolerance variable to only fire 
+  //when a certain difference is met 
+  //to prevent it from being too jittery
+  
+  frameRate(0.5);
 }
 
 void draw(){
-  // may need to convert pins to their RPI.PIN# versions here. 
+  //read the FSRs
+  int FSR1 = readadc(0, SPICLK, SPIMOSI, SPIMISO, SPICS);
+  int FSR2 = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS);
+  //int FSR3 = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS);
+  //int FSR4 = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS);
+  
+  
+  if(debug){
+    println("pressure 1:" + FSR1);
+    println("pressure 2:" + FSR2);
+  }
+  
+  //if threshold for tolerence is met, fire main program
+  
   
 }
 
-
+// read SPI data from MCP3008 chip, 8 possible adc's (0 through 7)
 int readadc(int adcnum, int clockpin, int mosipin, int misopin, int cspin){
   if((adcnum > 7) || (adcnum < 0)){
     return -1;
