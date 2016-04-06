@@ -6,7 +6,7 @@ int time_to_dis = 5; //a time to dissipation
 float[][] pointsFromCircle = new float[numPoint][numPoint];
 float[][] pointsFromInnerCircle = new float[numPoint][numPoint];
 float[][] pointsFromOuterCircle = new float[numPoint][numPoint];
-boolean circle = true;
+boolean waves = false;
 
 void setup() {
   size(720, 720);
@@ -20,9 +20,12 @@ void setup() {
 }
 
 void draw() {
+  //reset the background on each run through
   image(madison, -280, 0);
-  if (circle == false) {
-    circle = true;
+  
+  //start a new circle when the old one is done
+  if (waves == false) {
+    waves = true;
     a = random(width);
     b = random(height);
     r=1;
@@ -54,30 +57,31 @@ void draw() {
     //skip this point if x or y are out of bounds
     if (x >= width | x <= 0 | y >= height | y <= 0) {
       //check if points are beyond corner boundary
-      if (loc > 3*(width + height*width)) {
-        circle = false;
+      //if (loc > 3*(width + height*width)) { //too processor intesive to run it all the way to the edge
+      if (r > 200) {
+        waves = false;
         break;
       } else continue;
-    } else println("x:"+x + "| y:"+y);
+    } else ///println("x:"+x + "| y:"+y);
 
     // Look up the RGB color in the source image
     loadPixels();
     float r = red(madison.pixels[loc]);
     float rPlus = red(madison.pixels[loc]);
-    float rMinus = red(madison.pixels[loc]);
+    float rMinus = red(madison.pixels[locInner]);
     float g = green(madison.pixels[loc]);
     float gPlus = green(madison.pixels[loc]);
-    float gMinus = green(madison.pixels[loc]);
+    float gMinus = green(madison.pixels[locInner]);
     float b = blue(madison.pixels[loc]);
     float bPlus = blue(madison.pixels[loc]);
-    float bMinus = blue(madison.pixels[loc]);
+    float bMinus = blue(madison.pixels[locInner]);
 
     //make sure they are in bounds
-    if (locInner > 0 && locInner < 921000) {
+    /*if (locInner > 0 && locInner < 921000) {
       rMinus = red(madison.pixels[locInner]);
       gMinus = green(madison.pixels[locInner]);
       bMinus = blue(madison.pixels[locInner]);
-    }
+    }*/  //can't think of any times when the inner circle will be out of bounds
     if (locOuter < 921000 && locOuter > 0) {
       rPlus = red(madison.pixels[locOuter]);
       gPlus = green(madison.pixels[locOuter]);
