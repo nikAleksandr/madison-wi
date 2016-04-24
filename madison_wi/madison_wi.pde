@@ -9,21 +9,25 @@ int SPIMOSI = 24;
 int SPICS = 25;
 //set up variables to keep track of base value
 //everything has to be set up before running the program
-int FSR1_base = readadc(0, SPICLK, SPIMOSI, SPIMISO, SPICS);
-int FSR2_base = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS);
-//int FSR3_base = readadc(2, SPICLK, SPIMOSI, SPIMISO, SPICS);
-//int FSR4_base = readadc(3, SPICLK, SPIMOSI, SPIMISO, SPICS);
+int FSR1_base = readadc(0, SPICLK, SPIMOSI, SPIMISO, SPICS)+1;
+int FSR2_base = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS)+1;
+int FSR3_base = readadc(2, SPICLK, SPIMOSI, SPIMISO, SPICS)+1;
+int FSR4_base = readadc(3, SPICLK, SPIMOSI, SPIMISO, SPICS)+1;
 int FSR1, FSR2, FSR3, FSR4;
 //waves variables
 PImage madison;
-float x, y, a, b, r=1, th;
-int numPoint = 100;
+float a, b, r=10, th;
+int numPoint = 200;
 int blur = 30;
-int time_to_dis = 5; //a time to dissipation
+int endRadius = 50; //radius to dissipate
 float[][] pointsFromCircle = new float[numPoint][numPoint];
 float[][] pointsFromInnerCircle = new float[numPoint][numPoint];
 float[][] pointsFromOuterCircle = new float[numPoint][numPoint];
 boolean waves = false;
+boolean firstLoop = true;
+int x, y, loc, xInner, yInner, locInner, xOuter, yOuter, locOuter;
+float red, redPlus, redMinus, green, greenPlus, greenMinus, blue, bluePlus, blueMinus;
+
 
 boolean debug = true;
 
@@ -44,7 +48,7 @@ void setup() {
   noStroke();
   noFill();
   
-  frameRate(15);
+  frameRate(30);
 }
 
 void draw(){
@@ -53,17 +57,20 @@ void draw(){
   
   //read the FSRs if there isn't a current wave
   if(!waves){
-    int FSR1 = readadc(0, SPICLK, SPIMOSI, SPIMISO, SPICS);
-    int FSR2 = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS);
-    //int FSR3 = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS);
-    //int FSR4 = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS);
+     FSR1 = readadc(0, SPICLK, SPIMOSI, SPIMISO, SPICS);
+     FSR2 = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS);
+     FSR3 = readadc(2, SPICLK, SPIMOSI, SPIMISO, SPICS);
+     FSR4 = readadc(3, SPICLK, SPIMOSI, SPIMISO, SPICS);
     if(debug){
-      println("pressure 1:" + FSR1);
-      println("pressure 2:" + FSR2);
+      println("pressure 1:" + FSR1_base + " : " + FSR1);
+      println("pressure 2:" + FSR2_base + " : " + FSR2);
+      println("pressure 3:" + FSR3_base + " : " + FSR3);
+      println("pressure 4:" + FSR4_base + " : " + FSR4);
     }
     //if threshold for tolerence is met, fire main program
-    if(FSR1 > FSR1_base || FSR2 > FSR2_base ){
+    if(FSR1 > FSR1_base || FSR2 > FSR2_base || FSR3 > FSR3_base || FSR4 > FSR4_base ){
       println("make waves");
+      firstLoop = true;
       waves = true;
       a = random(width);
       b = random(height);
@@ -85,65 +92,69 @@ void draw(){
     //sample and blur points around circle
     for (int i = 0; i < numPoint; i++) {
       // Pick a point on the circle
-      int x = int(round(pointsFromCircle[i][0]));
-      int y = int(round(pointsFromCircle[i][1]));
-      int loc = x + y*madison.width;
-      int xInner = int(round(pointsFromInnerCircle[i][0]));
-      int yInner = int(round(pointsFromInnerCircle[i][1]));
-      int locInner = xInner + yInner*madison.width;
-      int xOuter = int(round(pointsFromOuterCircle[i][0]));
-      int yOuter = int(round(pointsFromOuterCircle[i][1]));
-      int locOuter = xOuter + yOuter*madison.width;
+      x = int(round(pointsFromCircle[i][0]));
+      y = int(round(pointsFromCircle[i][1]));
+      loc = x + y*madison.width;
+      xInner = int(round(pointsFromInnerCircle[i][0]));
+      yInner = int(round(pointsFromInnerCircle[i][1]));
+      locInner = xInner + yInner*madison.width;
+      xOuter = int(round(pointsFromOuterCircle[i][0]));
+      yOuter = int(round(pointsFromOuterCircle[i][1]));
+      locOuter = xOuter + yOuter*madison.width;
   
       //skip this point if x or y are out of bounds
       if (x >= width | x <= 0 | y >= height | y <= 0) {
         //check if points are beyond corner boundary
         //if (loc > 3*(width + height*width)) { //too processor intesive to run it all the way to the edge
-        if (r > 200) {
+        if (r > endRadius ) {
           waves = false;
           break;
         } else continue;
       } else ///println("x:"+x + "| y:"+y);
   
-      // Look up the RGB color in the source image
-      loadPixels();
-      float r = red(madison.pixels[loc]);
-      float rPlus = red(madison.pixels[loc]);
-      float rMinus = red(madison.pixels[locInner]);
-      float g = green(madison.pixels[loc]);
-      float gPlus = green(madison.pixels[loc]);
-      float gMinus = green(madison.pixels[locInner]);
-      float b = blue(madison.pixels[loc]);
-      float bPlus = blue(madison.pixels[loc]);
-      float bMinus = blue(madison.pixels[locInner]);
-  
-      //make sure they are in bounds
-      /*if (locInner > 0 && locInner < 921000) {
-        rMinus = red(madison.pixels[locInner]);
-        gMinus = green(madison.pixels[locInner]);
-        bMinus = blue(madison.pixels[locInner]);
-      }*/  //can't think of any times when the inner circle will be out of bounds
-      if (locOuter < 921000 && locOuter > 0) {
-        rPlus = red(madison.pixels[locOuter]);
-        gPlus = green(madison.pixels[locOuter]);
-        bPlus = blue(madison.pixels[locOuter]);
+      // Look up the RGB color in the source image if its the first time through
+      if(firstLoop){
+        loadPixels();
+        //use bit shifting for faster color loading
+        red = (madison.pixels[loc] >> 16) & 0xFF;
+        redPlus = (madison.pixels[loc] >> 16) & 0xFF;
+        redMinus = (madison.pixels[loc] >> 16) & 0xFF;
+        green = (madison.pixels[loc] >> 8) & 0xFF;
+        greenPlus = (madison.pixels[loc] >>8) & 0xFF;
+        greenMinus = (madison.pixels[loc] >>8) & 0xFF;
+        blue = (madison.pixels[loc]) & 0xFF;
+        bluePlus = (madison.pixels[loc]) & 0xFF;
+        blueMinus = (madison.pixels[loc]) & 0xFF;
+    
+        //make sure they are in bounds
+        if (locInner > 0 && locInner < 921000) {
+          redMinus = red(madison.pixels[locInner]);
+          greenMinus = green(madison.pixels[locInner]);
+          blueMinus = blue(madison.pixels[locInner]);
+        } 
+        if (locOuter < 921000 && locOuter > 0) {
+          redPlus = (madison.pixels[locOuter] >> 16) & 0xFF;
+          greenPlus = (madison.pixels[locOuter] >> 8) & 0xFF;
+          bluePlus = (madison.pixels[locOuter]) & 0xFF;
+        }
+        firstLoop = false;
       }
       noStroke();
   
       // Draw an ellipse at that location with that color
-      fill(r, g, b, 100);
+      fill(red, green, blue, 100);
       ellipse(x, y, blur, blur);
       //outer circle
-      fill(rPlus, gPlus, bPlus, 50);
+      fill(redPlus, greenPlus, bluePlus, 50);
       ellipse(xOuter, yOuter, blur, blur);
       //inner circle
-      fill(rMinus, gMinus, bMinus, 50);
+      fill(redMinus, greenMinus, blueMinus, 50);
       ellipse(xInner, yInner, blur, blur);
     }
   
     r += 10; 
   }
-  println(frameRate);
+  //println(frameRate);
 }
 
 // read SPI data from MCP3008 chip, 8 possible adc's (0 through 7)
