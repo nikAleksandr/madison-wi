@@ -1,5 +1,8 @@
 //Based on code written by Limor "Ladyada" for Adafruit Industries
 import processing.io.*;
+import ddf.minim.*;
+Minim minim;
+AudioPlayer player;
 // script uses Board numbers (IE Physical pin numbers)
 // processing defaults to GPIO number, RPI to use physical pin numbers
 // may need to convert pins to their RPI.PIN# versions here. 
@@ -24,7 +27,7 @@ float[][] pointsFromCircle = new float[numPoint][numPoint];
 float[][] pointsFromInnerCircle = new float[numPoint][numPoint];
 float[][] pointsFromOuterCircle = new float[numPoint][numPoint];
 boolean waves = false;
-boolean firstLoop = true;
+boolean sampleColors = true;
 int x, y, loc, xInner, yInner, locInner, xOuter, yOuter, locOuter;
 float red, redPlus, redMinus, green, greenPlus, greenMinus, blue, bluePlus, blueMinus;
 
@@ -32,6 +35,8 @@ float red, redPlus, redMinus, green, greenPlus, greenMinus, blue, bluePlus, blue
 boolean debug = true;
 
 void setup() {
+  minim = new Minim(this);
+  player = minim.loadFile("BLMProtestInMadison.mp3");
   //set up the SPI interface
   GPIO.pinMode(SPIMOSI, GPIO.OUTPUT);
   GPIO.pinMode(SPIMISO, GPIO.INPUT);
@@ -57,6 +62,8 @@ void draw(){
   
   //read the FSRs if there isn't a current wave
   if(!waves){
+     //player.pause(); 
+     
      FSR1 = readadc(0, SPICLK, SPIMOSI, SPIMISO, SPICS);
      FSR2 = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS);
      FSR3 = readadc(2, SPICLK, SPIMOSI, SPIMISO, SPICS);
@@ -70,7 +77,8 @@ void draw(){
     //if threshold for tolerence is met, fire main program
     if(FSR1 > FSR1_base || FSR2 > FSR2_base || FSR3 > FSR3_base || FSR4 > FSR4_base ){
       println("make waves");
-      firstLoop = true;
+      player.play();
+      sampleColors = true;
       waves = true;
       a = random(width);
       b = random(height);
@@ -79,7 +87,8 @@ void draw(){
   }
   
   if(waves){
-   //find points on circle and put them in array
+     player.play();
+    //find points on circle and put them in array
     for (int i = 0; i < numPoint; i++) {
       th = th + 360/numPoint;
       pointsFromCircle[i][0] = a + r*cos(th);
@@ -113,7 +122,7 @@ void draw(){
       } else ///println("x:"+x + "| y:"+y);
   
       // Look up the RGB color in the source image if its the first time through
-      if(firstLoop){
+      if(sampleColors){
         loadPixels();
         //use bit shifting for faster color loading
         red = (madison.pixels[loc] >> 16) & 0xFF;
@@ -137,7 +146,7 @@ void draw(){
           greenPlus = (madison.pixels[locOuter] >> 8) & 0xFF;
           bluePlus = (madison.pixels[locOuter]) & 0xFF;
         }
-        firstLoop = false;
+        sampleColors = false;
       }
       noStroke();
   
@@ -153,6 +162,8 @@ void draw(){
     }
   
     r += 10; 
+  } else {
+    player.pause();
   }
   //println(frameRate);
 }
@@ -187,6 +198,9 @@ int readadc(int adcnum, int clockpin, int mosipin, int misopin, int cspin){
     GPIO.digitalWrite(clockpin, GPIO.HIGH);
     GPIO.digitalWrite(clockpin, GPIO.LOW);
     adcout <<= 1;
+    //for some reason there is a problem with this everytime I reboot.
+    //to fix: Set the below to 1 == 1 and run.
+    //then cmd + z  to revert to the below and it will work.
     if(GPIO.digitalRead(misopin)==GPIO.HIGH){
       adcout |= 0x1;
     }
