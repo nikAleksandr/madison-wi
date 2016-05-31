@@ -1,5 +1,11 @@
+//set Pi volume | amixer cset numid=1 -- (volume in dB max 400)
 //Based on code written by Limor "Ladyada" for Adafruit Industries
 import processing.io.*;
+import ddf.minim.*;
+Minim minim;
+AudioPlayer player;
+float vol;
+int currentPosition;
 // script uses Board numbers (IE Physical pin numbers)
 // processing defaults to GPIO number, RPI to use physical pin numbers
 // may need to convert pins to their RPI.PIN# versions here. 
@@ -13,18 +19,19 @@ int FSR1_base = readadc(0, SPICLK, SPIMOSI, SPIMISO, SPICS)+1;
 int FSR2_base = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS)+1;
 int FSR3_base = readadc(2, SPICLK, SPIMOSI, SPIMISO, SPICS)+1;
 int FSR4_base = readadc(3, SPICLK, SPIMOSI, SPIMISO, SPICS)+1;
+boolean baseReset = false;
 int FSR1, FSR2, FSR3, FSR4;
 //waves variables
 PImage madison;
 float a, b, r=10, th;
 int numPoint = 200;
-int blur = 30;
-int endRadius = 50; //radius to dissipate
+int blur = 20;
+int endRadius = 300; //radius to dissipate
 float[][] pointsFromCircle = new float[numPoint][numPoint];
 float[][] pointsFromInnerCircle = new float[numPoint][numPoint];
 float[][] pointsFromOuterCircle = new float[numPoint][numPoint];
 boolean waves = false;
-boolean firstLoop = true;
+boolean sampleColors = true;
 int x, y, loc, xInner, yInner, locInner, xOuter, yOuter, locOuter;
 float red, redPlus, redMinus, green, greenPlus, greenMinus, blue, bluePlus, blueMinus;
 
@@ -32,6 +39,10 @@ float red, redPlus, redMinus, green, greenPlus, greenMinus, blue, bluePlus, blue
 boolean debug = true;
 
 void setup() {
+  //audio setup
+  minim = new Minim(this);
+  player = minim.loadFile("BLMProtestInMadison.mp3");
+  player.loop();
   //set up the SPI interface
   GPIO.pinMode(SPIMOSI, GPIO.OUTPUT);
   GPIO.pinMode(SPIMISO, GPIO.INPUT);
@@ -48,7 +59,7 @@ void setup() {
   noStroke();
   noFill();
   
-  frameRate(30);
+  frameRate(24);
 }
 
 void draw(){
@@ -57,6 +68,8 @@ void draw(){
   
   //read the FSRs if there isn't a current wave
   if(!waves){
+     player.pause(); 
+     
      FSR1 = readadc(0, SPICLK, SPIMOSI, SPIMISO, SPICS);
      FSR2 = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS);
      FSR3 = readadc(2, SPICLK, SPIMOSI, SPIMISO, SPICS);
@@ -70,16 +83,29 @@ void draw(){
     //if threshold for tolerence is met, fire main program
     if(FSR1 > FSR1_base || FSR2 > FSR2_base || FSR3 > FSR3_base || FSR4 > FSR4_base ){
       println("make waves");
-      firstLoop = true;
+      player.play();
+      sampleColors = true;
       waves = true;
       a = random(width);
       b = random(height);
-      r=1;
+      r=10;
     }
   }
   
+  //every 10 seconds of waves, reset the FSR base levels
+  currentPosition = player.position()/1000;
+  if(currentPosition % 10 == 0 && baseReset==false){
+    println("reset base values");
+    FSR1_base = readadc(0, SPICLK, SPIMOSI, SPIMISO, SPICS)+1;
+    FSR2_base = readadc(1, SPICLK, SPIMOSI, SPIMISO, SPICS)+1;
+    FSR3_base = readadc(2, SPICLK, SPIMOSI, SPIMISO, SPICS)+1;
+    FSR4_base = readadc(3, SPICLK, SPIMOSI, SPIMISO, SPICS)+1;
+    
+    baseReset = true;
+  } else if(currentPosition % 10 != 0){ baseReset = false; }
+  
   if(waves){
-   //find points on circle and put them in array
+    //find points on circle and put them in array
     for (int i = 0; i < numPoint; i++) {
       th = th + 360/numPoint;
       pointsFromCircle[i][0] = a + r*cos(th);
@@ -106,14 +132,16 @@ void draw(){
       if (x >= width | x <= 0 | y >= height | y <= 0) {
         //check if points are beyond corner boundary
         //if (loc > 3*(width + height*width)) { //too processor intesive to run it all the way to the edge
-        if (r > endRadius ) {
+        continue;
+      } //else println("x:"+x + "| y:"+y);
+      //end if max radius is reached
+      if (r > endRadius ) {
           waves = false;
           break;
-        } else continue;
-      } else ///println("x:"+x + "| y:"+y);
+      }
   
-      // Look up the RGB color in the source image if its the first time through
-      if(firstLoop){
+      // Look up the RGB color in the source image if sampleColors is true
+      if(sampleColors){
         loadPixels();
         //use bit shifting for faster color loading
         red = (madison.pixels[loc] >> 16) & 0xFF;
@@ -137,7 +165,7 @@ void draw(){
           greenPlus = (madison.pixels[locOuter] >> 8) & 0xFF;
           bluePlus = (madison.pixels[locOuter]) & 0xFF;
         }
-        firstLoop = false;
+        sampleColors = false;
       }
       noStroke();
   
@@ -151,8 +179,10 @@ void draw(){
       fill(redMinus, greenMinus, blueMinus, 50);
       ellipse(xInner, yInner, blur, blur);
     }
-  
-    r += 10; 
+    
+    r += 10;
+    //reSample colors every so often
+    /*if(r % 100 == 0) sampleColors = true;*/
   }
   //println(frameRate);
 }
@@ -187,6 +217,9 @@ int readadc(int adcnum, int clockpin, int mosipin, int misopin, int cspin){
     GPIO.digitalWrite(clockpin, GPIO.HIGH);
     GPIO.digitalWrite(clockpin, GPIO.LOW);
     adcout <<= 1;
+    //for some reason there is a problem with this everytime I reboot.
+    //to fix: Set the below to 1 == 1 and run.
+    //then cmd + z  to revert to the below and it will work.
     if(GPIO.digitalRead(misopin)==GPIO.HIGH){
       adcout |= 0x1;
     }
